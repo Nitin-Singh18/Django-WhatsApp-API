@@ -10,6 +10,8 @@ import random
 import requests
 from dotenv import load_dotenv
 import os
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 load_dotenv()
 
@@ -21,6 +23,12 @@ url = os.getenv("WHATSAPP_API_URL")
 
 
 # View to request OTP
+@swagger_auto_schema(
+    method='post',
+    request_body=OTPSerializer,
+    responses={
+        200: openapi.Response('OTP sent successfully', OTPSerializer),
+    })
 @api_view(['POST'])
 def request_otp(request):
     try:
@@ -84,7 +92,12 @@ def send_otp_via_whatsapp(phone_number, otp_code):
     return response.status_code
 
 
-# View to verify OTP
+@swagger_auto_schema(
+    method='post', request_body=OTPVerifySerial,
+    responses={
+        200: openapi.Response('OTP verified successfully'),
+        400: openapi.Response('Invalid or expired OTP')
+    })
 @api_view(['POST'])
 def verify_otp(request):
     serializer = OTPVerifySerial(data=request.data)
@@ -108,6 +121,20 @@ def verify_otp(request):
 
 
 # View to send promotional message
+@swagger_auto_schema(
+    method='post',
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'phone_number': openapi.Schema(type=openapi.TYPE_STRING,
+                                           description='Phone number'),
+            'message_content': openapi.Schema(type=openapi.TYPE_STRING,
+                                              description='Message'),
+        }),
+    responses={
+        200: openapi.Response('Message sent successfully'),
+        400: openapi.Response('Phone number and message content are required')
+    })
 @api_view(['POST'])
 def send_promotional_message(request):
     phone_number = request.data.get('phone_number')

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'whatsapp_otp',
     'rest_framework',
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
