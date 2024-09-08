@@ -17,9 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
-from whatsapp_api import whatsapp_api
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include(whatsapp_api.urls)),
+    path('', include("whatsapp_otp.urls")),
 ]
