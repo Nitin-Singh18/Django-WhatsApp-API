@@ -13,6 +13,7 @@ import os
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+# Load ENV variables
 load_dotenv()
 
 headers = {
@@ -32,21 +33,23 @@ url = os.getenv("WHATSAPP_API_URL")
 @api_view(['POST'])
 def request_otp(request):
     try:
-        phone_number = request.data.get('phone_number')
         serializer = OTPSerializer(data=request.data)
         if serializer.is_valid():
+            phone_number = serializer.validated_data['phone_number']
+            # Create a 4 digit random number
             otp_code = str(random.randint(1000, 9999))
 
-            whatsapp_response = send_otp_via_whatsapp(phone_number=phone_number,
-                                                      otp_code=otp_code)
+            # Send OTP to user's whatsapp
+            whatsapp_response = send_otp_via_whatsapp(phone_number=phone_number, otp_code=otp_code)
 
-            if whatsapp_response == status.HTTP_200_OK:
+            # Create an instance of OTP to user's phone number with created OTP
+            if whatsapp_response.status_code == status.HTTP_200_OK:
                 OTP.objects.create(phone_number=phone_number, otp_code=otp_code)
                 return Response(
                     {"message": "OTP sent successfully", "data": serializer.data, "otp": otp_code,
                      "whatsapp_res": whatsapp_response},
                     status=status.HTTP_200_OK)
-            return Response({"whatsapp_code": whatsapp_response})
+            return Response({"whatsapp_code": whatsapp_response.json()})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -89,9 +92,10 @@ def send_otp_via_whatsapp(phone_number, otp_code):
         }
     }
     response = requests.post(url, headers=headers, data=json.dumps(data))
-    return response.status_code
+    return response
 
 
+# View to verify OTP
 @swagger_auto_schema(
     method='post', request_body=OTPVerifySerial,
     responses={
@@ -105,16 +109,19 @@ def verify_otp(request):
         phone_number = serializer.validated_data['phone_number']
         otp_code = serializer.validated_data['otp_code']
         try:
+            #  Filter an OTP object with provided phone_number and otp_code
             otp = OTP.objects.filter(phone_number=phone_number, otp_code=otp_code, is_verified=False).latest(
                 'created_at')
         except OTP.DoesNotExist:
             return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Check if OTP is not older than 5 minutes
         if (timezone.now() - otp.created_at).total_seconds() > 300:
             return Response({"error": "OTP has expired"}, status=status.HTTP_400_BAD_REQUEST)
         otp.verified = True
         otp.save()
 
+        # Delete OTP object when verified successfully
         otp.delete()
         return Response({"success": "OTP verified successfully"}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -168,11 +175,11 @@ def send_promotional_message(request):
 
     try:
         response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
 
         if response.status_code == 200:
             return Response({"success": "Message sent successfully!"}, status=status.HTTP_200_OK)
         else:
+            response_data = response.json()
             return Response({"error": response_data}, status=response.status_code)
 
     except requests.RequestException as e:
